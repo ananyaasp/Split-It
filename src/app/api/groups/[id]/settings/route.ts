@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { GroupType } from "@/generated/prisma/client";
+import { GroupType } from "@prisma/client";
 
 export async function PUT(
   request: Request,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { SplitType } from "@/generated/prisma/client";
+import { SplitType } from "@prisma/client";
 
 export async function POST(
   request: Request,
