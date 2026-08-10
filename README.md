@@ -1,81 +1,117 @@
-# Split-It
+💸 Split-It
+A modern, full-stack expense sharing & debt simplification platform built with Next.js 16, TypeScript, Prisma, and Tailwind CSS.
 
-A Splitwise-style app for tracking shared expenses, splitting bills, and understanding spending patterns.
+Next.jsReactTypeScriptPrismaTailwind CSSPWA Ready
 
-## Stack
+Features
+ • 
+Tech Stack
+ • 
+Getting Started
+ • 
+Database Schema
+ • 
+Project Structure
 
-- **Frontend & API:** Next.js 16 (App Router) + TypeScript
-- **Styling:** Tailwind CSS
-- **Database:** PostgreSQL via Prisma ORM
-- **Auth:** NextAuth (Auth.js) with email/password credentials
+✨ Key Features
+🔐 Authentication & Security: NextAuth.js (v5) with email/password credentials and email OTP verification for registration & password resets.
+👥 Group Management: Create groups, assign categories (RESTAURANT, VACATION, GROCERY, etc.), set roles (ADMIN, MEMBER), customized group currencies, and shareable join codes.
+🧾 Itemized Line-Item Expense Splits: Log expenses with individual items, assign specific payers, and split line items equally, fully, or with exact custom amounts/ratios.
+🧮 Greedy Debt Simplification Algorithm: Minimizes overall group transactions by calculating net balances and optimizing direct transfer obligations.
+🧾 AI Receipt Scanning: Integrated OCR endpoint (/api/ai/scan-receipt) to auto-extract line items and totals from uploaded bills.
+📊 Analytics & Monthly Digest: Spending analytics visualization (/api/analytics) and cron-based email digest generation (/api/cron/monthly-digest).
+📱 PWA (Progressive Web App): Installable web app experience with manifest configuration for mobile and desktop devices.
+🛠️ Tech Stack
+Framework: Next.js 16 (App Router) + React 19 + TypeScript
+Styling: Tailwind CSS v4 + Vanilla CSS + Glassmorphism Dark UI
+Database & ORM: PostgreSQL + Prisma ORM v6
+Auth & Security: NextAuth.js v5 (Auth.js) + bcryptjs + Nodemailer OTP
+Validation: Zod
+PWA: Web App Manifest
+🚀 Getting Started
+1. Prerequisites
+Make sure you have Node.js 18+ and PostgreSQL installed locally or access to a cloud PostgreSQL database (e.g., Supabase, Neon, Prisma Postgres).
 
-## Week 1 — What's included
+2. Clone the repository
+bash
 
-- [x] Next.js + TypeScript + Tailwind scaffold
-- [x] PostgreSQL schema draft (users, groups, expenses, splits)
-- [x] Sign up / sign in / sign out
-- [x] Protected dashboard layout (dashboard, groups, profile)
+git clone https://github.com/your-username/split-it.git
+cd split-it
+3. Install dependencies
+bash
 
-## Getting started
-
-### 1. Install dependencies
-
-```bash
 npm install
-```
+4. Configure Environment Variables
+Copy .env.example to .env:
 
-### 2. Configure environment
+bash
 
-Copy the example env file and set your values:
-
-```bash
 cp .env.example .env
-```
+Update your .env with your actual database connection string and authentication secrets:
 
-Required variables:
+env
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `AUTH_SECRET` | Random secret for sessions (`openssl rand -base64 32`) |
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/splitit?schema=public"
+AUTH_SECRET="your-random-32-byte-secret"
+EMAIL_SERVER_HOST="smtp.gmail.com"
+EMAIL_SERVER_PORT="587"
+EMAIL_SERVER_USER="your-email@gmail.com"
+EMAIL_SERVER_PASSWORD="your-app-password"
+EMAIL_FROM="Split-It <noreply@split-it.com>"
+5. Push Schema to Database
+Generates Prisma Client and syncs database tables:
 
-**Database options:**
+bash
 
-- **Local PostgreSQL:** `postgresql://postgres:postgres@localhost:5432/splitit?schema=public`
-- **Prisma Postgres (dev):** run `npx prisma dev` and use the URL it prints
-
-### 3. Push schema to database
-
-```bash
 npm run db:push
-```
+6. Run Development Server
+bash
 
-### 4. Start the dev server
-
-```bash
 npm run dev
-```
+Open http://localhost:3000 in your browser.
 
-Open [http://localhost:3000](http://localhost:3000).
+📜 Available Scripts
+Command	Description
+npm run dev	Starts the Next.js development server
+npm run build	Builds the production bundle
+npm run start	Runs the production build
+npm run lint	Runs ESLint checks
+npm run db:generate	Generates Prisma Client types
+npm run db:push	Pushes Prisma schema directly to PostgreSQL database
+npm run db:studio	Opens Prisma Studio GUI database explorer
+🗄️ Database Schema
+The core models defined in 
+prisma/schema.prisma
+:
 
-## Project structure
 
-```
-src/
-├── app/
-│   ├── (auth)/          # Login & register
-│   ├── (dashboard)/     # Protected pages
-│   └── api/auth/        # NextAuth + register API
-├── components/
-├── lib/
-│   ├── auth.ts          # NextAuth config
-│   └── db.ts            # Prisma client
-└── generated/prisma/    # Prisma client output
-```
+User (id, name, email, passwordHash, emailVerified...)
+ ├── GroupMember (groupId, userId, role) ── Group (id, name, type, currency, inviteCode...)
+ ├── Expense (groupId, title, category, createdById...)
+ │    └── ExpenseItem (expenseId, name, amount, payerId, splitType)
+ │         └── ItemSplit (expenseItemId, userId, shareAmount)
+ └── OtpToken (email, code, type, expiresAt...)
+📂 Project Structure
 
-## Next up (Phase 1)
+split-it/
+├── prisma/
+│   └── schema.prisma         # PostgreSQL schema definition
+├── src/
+│   ├── app/
+│   │   ├── (auth)/           # Login, Register, Forgot Password
+│   │   ├── (dashboard)/      # Dashboard, Groups, Profile, Analytics
+│   │   ├── api/              # Auth, Group, User, AI, Analytics & Cron APIs
+│   │   ├── globals.css       # Global styles & Tailwind configuration
+│   │   └── manifest.ts       # PWA manifest
+│   ├── components/           # UI components grouped by feature domain
+│   └── lib/
+│       ├── auth.ts           # NextAuth configuration
+│       ├── balances.ts       # Debt calculation & simplification algorithm
+│       ├── db.ts             # Prisma client instance
+│       └── email.ts          # Nodemailer email logic
+└── package.json
+🤝 Contributing
+Contributions, issues, and feature requests are welcome! Feel free to check the issues page.
 
-- Create groups and invite members
-- Add expenses with line-item splits
-- Balance calculation engine
-- Activity log ("User A owes User B ₹X")
+📝 License
+Distributed under the MIT License. See LICENSE for more information.
