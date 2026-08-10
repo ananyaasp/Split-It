@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  passwordHash   String
+  image          String?
+  emailVerified  Boolean   @default(false)
+  lastNameChange DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  groupMembers    GroupMember[]
+  expensesCreated Expense[]     @relation("ExpenseCreator")
+  itemsPaid       ExpenseItem[] @relation("ItemPayer")
+  itemSplits      ItemSplit[]
+}
+
+enum GroupType {
+  RESTAURANT
+  VACATION
+  GROCERY
+  SHOPPING
+  OTHER
+}
+
+enum GroupRole {
+  ADMIN
+  MEMBER
+}
+
+model Group {
+  id             String    @id @default(cuid())
+  name           String
+  type           GroupType @default(OTHER)
+  customType     String?
+  description    String?
+  currency       String    @default("₹")
+  inviteCode     String?   @unique
+  simplifyDebts  Boolean   @default(true)
+  membersCanEdit Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  members  GroupMember[]
+  expenses Expense[]
+}
+
+model GroupMember {
+  id       String    @id @default(cuid())
+  groupId  String
+  userId   String
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+}
+
+enum SplitType {
+  EQUAL
+  FULL
+  CUSTOM
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  groupId     String
+  title       String
+  category    String?
+  expenseDate DateTime @default(now())
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  group     Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy User          @relation("ExpenseCreator", fields: [createdById], references: [id])
+  items     ExpenseItem[]
+
+  @@index([groupId])
+  @@index([createdById])
+  @@index([expenseDate])
+}
+
+model ExpenseItem {
+  id        String    @id @default(cuid())
+  expenseId String
+  name      String
+  amount    Decimal   @db.Decimal(10, 2)
+  payerId   String
+  splitType SplitType @default(EQUAL)
+  createdAt DateTime  @default(now())
+
+  expense Expense     @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  payer   User        @relation("ItemPayer", fields: [payerId], references: [id])
+  splits  ItemSplit[]
+
+  @@index([expenseId])
+  @@index([payerId])
+}
+
+model ItemSplit {
+  id            String   @id @default(cuid())
+  expenseItemId String
+  userId        String
+  shareAmount   Decimal? @db.Decimal(10, 2)
+  shareRatio    Decimal? @db.Decimal(5, 4)
+
+  expenseItem ExpenseItem @relation(fields: [expenseItemId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@unique([expenseItemId, userId])
+  @@index([expenseItemId])
+  @@index([userId])
+}
+
+enum OtpType {
+  REGISTRATION
+  PASSWORD_RESET
+}
+
+model OtpToken {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  type      OtpType
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, type])
+}
