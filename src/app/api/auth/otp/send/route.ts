@@ -84,13 +84,21 @@ export async function POST(request: Request) {
     });
 
     // Send email
-    await sendOtpEmail(normalizedEmail, otp, type);
+    try {
+      await sendOtpEmail(normalizedEmail, otp, type);
+    } catch (emailErr: any) {
+      console.error("Nodemailer error sending OTP:", emailErr);
+      return NextResponse.json(
+        { error: `Email error: ${emailErr.message || "Check EMAIL_USER / EMAIL_PASS"}` },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Error sending OTP:", error);
     return NextResponse.json(
-      { error: "Failed to send verification code. Please try again." },
+      { error: error?.message || "Failed to send verification code. Please try again." },
       { status: 500 }
     );
   }
