@@ -1,11 +1,15 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { calculateGroupBalances } from "@/lib/balances";
 
 export default async function DashboardPage() {
   const session = await auth();
-  const userId = session!.user!.id;
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+  const userId = session.user.id;
 
   const memberships = await db.groupMember.findMany({
     where: { userId },
