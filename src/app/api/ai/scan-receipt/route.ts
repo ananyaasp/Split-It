@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     if (!apiKey && !groqApiKey && !openRouterApiKey) {
       return NextResponse.json(
         { 
-          error: "AI scanning is not configured. Please add GEMINI_API_KEY or GROQ_API_KEY to your .env file.",
+          error: "AI scanning is not configured. Please add GEMINI_API_KEY (free at aistudio.google.com) to your environment variables.",
           demoAvailable: true 
         },
         { status: 533 }
@@ -106,63 +106,13 @@ Rules:
     let lastErrorText = "";
     let isRateLimited = false;
 
-    // 1. Try Groq API if configured (100% free with no credit card required)
-    if (groqApiKey) {
-      const groqModelsToTry = [
-        "llama-3.2-11b-vision-preview",
-        "llama-3.2-90b-vision-preview",
-      ];
-
-      for (const groqModel of groqModelsToTry) {
-        try {
-          const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${groqApiKey.trim()}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: groqModel,
-              messages: [
-                {
-                  role: "user",
-                  content: [
-                    { type: "text", text: prompt },
-                    {
-                      type: "image_url",
-                      image_url: {
-                        url: `data:${mimeType};base64,${imageBase64}`,
-                      },
-                    },
-                  ],
-                },
-              ],
-              temperature: 0.1,
-              max_tokens: 2048,
-            }),
-          });
-
-          if (groqRes.ok) {
-            const groqData = await groqRes.json();
-            rawText = groqData?.choices?.[0]?.message?.content || "";
-            if (rawText) break;
-          } else {
-            lastErrorText = await groqRes.text();
-            console.error(`Groq Vision API error with model ${groqModel}:`, lastErrorText);
-          }
-        } catch (err: any) {
-          console.error(`Groq Vision exception with model ${groqModel}:`, err);
-        }
-      }
-    }
-
-    // 2. Try Gemini models if rawText not obtained yet and GEMINI_API_KEY exists
-    if (!rawText && apiKey) {
+    // 1. Try Gemini models first (free tier available, best vision support)
+    if (apiKey) {
       const modelsToTry = [
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite-preview-02-05",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
+        "gemini-3.6-flash",
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+        "gemini-3.7-flash",
       ];
 
       for (const model of modelsToTry) {
@@ -210,6 +160,9 @@ Rules:
         }
       }
     }
+
+
+
 
     // 3. Try OpenRouter free models if rawText not obtained yet and OPENROUTER_API_KEY exists
     if (!rawText && openRouterApiKey) {
