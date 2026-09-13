@@ -109,9 +109,8 @@ Rules:
     // 1. Try Groq API if configured (100% free with no credit card required)
     if (groqApiKey) {
       const groqModelsToTry = [
-        "llama-3.2-11b-vision-instruct",
-        "llama-3.2-90b-vision-instruct",
-        "qwen/qwen3.6-27b",
+        "llama-3.2-11b-vision-preview",
+        "llama-3.2-90b-vision-preview",
       ];
 
       for (const groqModel of groqModelsToTry) {
@@ -139,7 +138,7 @@ Rules:
                 },
               ],
               temperature: 0.1,
-              response_format: { type: "json_object" },
+              max_tokens: 2048,
             }),
           });
 
