@@ -390,10 +390,10 @@ export function GroupDetailClient({
         if (isNaN(itemAmt) || itemAmt <= 0 || item.selectedUsers.length === 0) return;
 
         if (item.splitType === "CUSTOM") {
-          item.selectedUsers.forEach((uId) => {
-            const share = parseFloat(item.customShares[uId] || "0");
+          group.members.forEach((m) => {
+            const share = parseFloat(item.customShares[m.user.id] || "0");
             if (!isNaN(share) && share > 0) {
-              userSubtotals[uId] = (userSubtotals[uId] || 0) + share;
+              userSubtotals[m.user.id] = (userSubtotals[m.user.id] || 0) + share;
               totalFoodSubtotal += share;
             }
           });
@@ -577,12 +577,49 @@ export function GroupDetailClient({
           };
         }
 
+        if (item.splitType === "CUSTOM") {
+          let totalCustom = 0;
+          const activeCustomSplits: { userId: string; shareAmount: number }[] = [];
+
+          for (const m of group.members) {
+            const raw = item.customShares?.[m.user.id];
+            const share = raw !== undefined && raw !== "" ? parseFloat(raw) : 0;
+            if (isNaN(share) || share < 0) {
+              throw new Error(`Please enter valid amounts for "${item.name || "Item"}"`);
+            }
+            if (share > 0) {
+              activeCustomSplits.push({
+                userId: m.user.id,
+                shareAmount: Math.round(share * 100) / 100,
+              });
+            }
+            totalCustom += share;
+          }
+
+          if (activeCustomSplits.length === 0) {
+            throw new Error(`Enter custom amounts for "${item.name || "Item"}"`);
+          }
+
+          if (Math.abs(totalCustom - amountNum) > 0.05) {
+            const diff = Math.round((amountNum - totalCustom) * 100) / 100;
+            const diffStr = diff > 0 ? `${curr}${diff.toFixed(2)} remaining` : `${curr}${Math.abs(diff).toFixed(2)} over`;
+            throw new Error(
+              `Custom amounts for "${item.name || "Item"}" must add up to ${curr}${amountNum.toFixed(2)} (currently ${curr}${totalCustom.toFixed(2)} — ${diffStr})`
+            );
+          }
+
+          return {
+            name: item.name || "Item",
+            amount: amountNum,
+            payerId: item.payerId,
+            splitType: "CUSTOM",
+            splits: activeCustomSplits,
+          };
+        }
+
         const splits = item.selectedUsers.map((uId) => ({
           userId: uId,
-          shareAmount:
-            item.splitType === "CUSTOM"
-              ? parseFloat(item.customShares[uId] || "0")
-              : 0,
+          shareAmount: 0,
         }));
 
         return {
@@ -2088,6 +2125,31 @@ export function GroupDetailClient({
                         <div className="space-y-2 pt-1">
                           <div className="flex items-center justify-between">
                             <span className="text-[11px] text-zinc-500 font-medium">Custom Amount per Member ({curr})</span>
+                            {(() => {
+                              const lineAmt = parseFloat(item.amount || "0") || 0;
+                              const currentSum = group.members.reduce(
+                                (acc, m) => acc + (parseFloat(item.customShares?.[m.user.id] || "0") || 0),
+                                0
+                              );
+                              const isExactMatch = lineAmt > 0 && Math.abs(currentSum - lineAmt) < 0.05;
+                              const diff = Math.round((lineAmt - currentSum) * 100) / 100;
+                              return (
+                                <span
+                                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                    isExactMatch
+                                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                      : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                  }`}
+                                >
+                                  Total: {curr}{currentSum.toFixed(2)} / {curr}{lineAmt.toFixed(2)}
+                                  {!isExactMatch && lineAmt > 0 && (
+                                    <span className="ml-1 font-normal opacity-80">
+                                      ({diff > 0 ? `${curr}${diff.toFixed(2)} left` : `${curr}${Math.abs(diff).toFixed(2)} over`})
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })()}
                           </div>
                           <div className="grid gap-2 sm:grid-cols-2">
                             {group.members.map((m) => (
@@ -2098,15 +2160,24 @@ export function GroupDetailClient({
                                 <input
                                   type="number"
                                   step="0.01"
+                                  min="0"
                                   placeholder="0.00"
-                                  value={item.customShares[m.user.id] || ""}
+                                  value={item.customShares?.[m.user.id] || ""}
                                   onChange={(e) => {
                                     const updated = [...lineItems];
-                                    updated[idx].customShares = {
+                                    const newCustomShares = {
                                       ...updated[idx].customShares,
                                       [m.user.id]: e.target.value,
                                     };
-                                    setLineItems(updated);
+                                    updated[idx].customShares = newCustomShares;
+                                    const activeUsers = group.members
+                                      .filter((mem) => {
+                                        const v = newCustomShares[mem.user.id];
+                                        return v !== undefined && v !== "" && parseFloat(v) > 0;
+                                      })
+                                      .map((mem) => mem.user.id);
+                                    updated[idx].selectedUsers = activeUsers.length > 0 ? activeUsers : group.members.map((mem) => mem.user.id);
+                                    setLineItems(autoCalculateTaxShares(updated));
                                   }}
                                   className="w-20 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 px-2 py-1 text-xs text-zinc-900 dark:text-zinc-100 text-right"
                                 />

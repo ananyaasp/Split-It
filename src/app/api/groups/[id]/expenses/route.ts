@@ -72,6 +72,12 @@ export async function POST(
         }));
       } else {
         // CUSTOM
+        const totalSplit = rawSplits.reduce((acc, s) => acc + Number(s.shareAmount || 0), 0);
+        if (Math.abs(totalSplit - amount) > 0.05) {
+          throw new Error(
+            `Custom amounts for "${name}" must add up to ${amount.toFixed(2)} (currently ${totalSplit.toFixed(2)})`
+          );
+        }
         formattedSplits = rawSplits.map((s) => {
           const share = Number(s.shareAmount || 0);
           return {
@@ -272,6 +278,13 @@ export async function PUT(
           shareRatio: 1,
         }));
       } else {
+        // CUSTOM
+        const totalSplit = rawSplits.reduce((acc, s) => acc + Number(s.shareAmount || 0), 0);
+        if (Math.abs(totalSplit - amount) > 0.05) {
+          throw new Error(
+            `Custom amounts for "${name}" must add up to ${amount.toFixed(2)} (currently ${totalSplit.toFixed(2)})`
+          );
+        }
         formattedSplits = rawSplits.map((s) => {
           const share = Number(s.shareAmount || 0);
           return {
