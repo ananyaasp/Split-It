@@ -21,6 +21,7 @@ interface ItemSplit {
   id: string;
   userId: string;
   shareAmount: number | null;
+  shareRatio?: number | null;
   user: UserSummary;
 }
 
@@ -440,17 +441,46 @@ export function GroupDetailClient({
     setExpenseTitle(expense.title);
     setExpenseCategory(expense.category || "Grocery");
     setLineItems(
-      expense.items.map((item) => ({
-        name: item.name,
-        amount: String(Number(item.amount)),
-        payerId: item.payerId,
-        splitType: item.splitType,
-        selectedUsers: item.splits.map((s) => s.userId),
-        customShares: item.splits.reduce(
-          (acc, s) => ({ ...acc, [s.userId]: String(Number(s.shareAmount || 0)) }),
-          {} as Record<string, string>
-        ),
-      }))
+      expense.items.map((item) => {
+        const itemAmount = Number(item.amount);
+        const customShares: Record<string, string> = {};
+        const customPercentages: Record<string, string> = {};
+
+        item.splits.forEach((s) => {
+          const share = Number(s.shareAmount || 0);
+          customShares[s.userId] = String(share);
+
+          // Calculate percentage from ratio or amount
+          if (s.shareRatio != null && Number(s.shareRatio) > 0) {
+            customPercentages[s.userId] = String(Math.round(Number(s.shareRatio) * 1000) / 10);
+          } else if (itemAmount > 0) {
+            customPercentages[s.userId] = String(Math.round((share / itemAmount) * 1000) / 10);
+          }
+        });
+
+        // Determine if this was originally a PERCENTAGE split
+        // A percentage split has distinct percentages that add up to ~100% and differs from equal split
+        let detectedSplitType = item.splitType;
+        if (item.splitType === "CUSTOM" || item.splitType === "PERCENTAGE") {
+          const hasRatios = item.splits.some((s) => s.shareRatio != null && Number(s.shareRatio) > 0);
+          const totalPct = Object.values(customPercentages).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+          const isNotEqual = item.splits.length > 1 && new Set(item.splits.map((s) => s.shareAmount)).size > 1;
+
+          if (hasRatios && Math.abs(totalPct - 100) < 1 && isNotEqual) {
+            detectedSplitType = "PERCENTAGE";
+          }
+        }
+
+        return {
+          name: item.name,
+          amount: String(itemAmount),
+          payerId: item.payerId,
+          splitType: detectedSplitType,
+          selectedUsers: item.splits.map((s) => s.userId),
+          customShares,
+          customPercentages,
+        };
+      })
     );
     setExpenseError("");
     setIsExpenseModalOpen(true);
