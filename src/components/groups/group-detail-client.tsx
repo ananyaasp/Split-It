@@ -119,6 +119,7 @@ interface LineItemForm {
   splitType: string;
   selectedUsers: string[];
   customShares: Record<string, string>;
+  customPercentages?: Record<string, string>;
 }
 
 export function GroupDetailClient({
@@ -142,6 +143,7 @@ export function GroupDetailClient({
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [useSimplified, setUseSimplified] = useState(group.simplifyDebts !== false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showArchivedExpenses, setShowArchivedExpenses] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -506,6 +508,45 @@ export function GroupDetailClient({
           throw new Error(`Please enter a valid amount for "${item.name || "Item"}"`);
         }
 
+        if (item.selectedUsers.length === 0) {
+          throw new Error(`Select at least one member to split "${item.name || "Item"}"`);
+        }
+
+        if (item.splitType === "PERCENTAGE") {
+          let totalPct = 0;
+          for (const uId of item.selectedUsers) {
+            const pct = parseFloat(item.customPercentages?.[uId] || "0");
+            if (isNaN(pct) || pct < 0) {
+              throw new Error(`Please enter valid percentages for "${item.name || "Item"}"`);
+            }
+            totalPct += pct;
+          }
+
+          if (Math.abs(totalPct - 100) > 0.05) {
+            throw new Error(
+              `Percentages for "${item.name || "Item"}" must add up to 100% (currently ${Math.round(totalPct * 10) / 10}%)`
+            );
+          }
+
+          const splits = item.selectedUsers.map((uId) => {
+            const pct = parseFloat(item.customPercentages?.[uId] || "0");
+            const share = Math.round(((pct / 100) * amountNum) * 100) / 100;
+            return {
+              userId: uId,
+              shareAmount: share,
+              shareRatio: Math.round((pct / 100) * 10000) / 10000,
+            };
+          });
+
+          return {
+            name: item.name || "Item",
+            amount: amountNum,
+            payerId: item.payerId,
+            splitType: "CUSTOM",
+            splits,
+          };
+        }
+
         const splits = item.selectedUsers.map((uId) => ({
           userId: uId,
           shareAmount:
@@ -766,8 +807,13 @@ export function GroupDetailClient({
     0
   );
 
+  // Check if all settlements in the group are completed
+  const hasSettlements = group.expenses.some((exp) => exp.category === "SETTLEMENT");
+  const hasDebts = balances.pairwiseDebts.length > 0;
+  const isAllSettled = hasSettlements && !hasDebts;
+
   // Filtered Expenses by Search Query
-  const filteredExpenses = group.expenses.filter((exp) => {
+  const allFilteredExpenses = group.expenses.filter((exp) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     const titleMatch = exp.title.toLowerCase().includes(q);
@@ -775,6 +821,11 @@ export function GroupDetailClient({
     const payerMatch = exp.items.some((i) => i.payer.name.toLowerCase().includes(q));
     return titleMatch || itemMatch || payerMatch;
   });
+
+  // When all debts are settled, clear items from main group view unless user chooses to view archived
+  const activeExpenses = isAllSettled && !showArchivedExpenses
+    ? allFilteredExpenses.filter((exp) => exp.category === "SETTLEMENT")
+    : allFilteredExpenses;
 
   const categoryBadgeText =
     group.type === "OTHER" && group.customType
@@ -855,7 +906,9 @@ export function GroupDetailClient({
           {[
             {
               key: "activity" as const,
-              label: `Expenses (${group.expenses.length})`,
+              label: isAllSettled && !showArchivedExpenses
+                ? `Expenses (${activeExpenses.length})`
+                : `Expenses (${group.expenses.length})`,
             },
             { key: "balances" as const, label: "Balances & Debts" },
             { key: "analytics" as const, label: "Analytics" },
@@ -906,13 +959,43 @@ export function GroupDetailClient({
             </div>
           )}
 
-          {filteredExpenses.length === 0 ? (
+          {/* All Settled Notification Banner */}
+          {isAllSettled && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-5 dark:border-emerald-900/60 dark:bg-emerald-950/40 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">🎉</span>
+                <div>
+                  <h3 className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                    All Debts Settled!
+                  </h3>
+                  <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400">
+                    All balances between members have been paid. Item expenses are cleared from the group. Deleting a settlement payment below will restore previous items.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowArchivedExpenses(!showArchivedExpenses)}
+                className="self-start sm:self-center shrink-0 rounded-xl border border-emerald-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-300 dark:hover:bg-zinc-800 shadow-sm transition-colors"
+              >
+                {showArchivedExpenses ? "Hide Cleared Expenses" : "View Cleared Expenses"}
+              </button>
+            </div>
+          )}
+
+          {activeExpenses.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
               <p className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                {searchQuery ? "No matching expenses found" : "No expenses logged yet"}
+                {isAllSettled
+                  ? "All settled up! Group items are cleared."
+                  : searchQuery
+                  ? "No matching expenses found"
+                  : "No expenses logged yet"}
               </p>
               <p className="mt-1 text-sm text-zinc-500">
-                {searchQuery
+                {isAllSettled
+                  ? "Start fresh for your next trip, or click 'View Cleared Expenses' to review history."
+                  : searchQuery
                   ? "Try searching for a different item name or payer."
                   : 'Click "+ Add Expense" to start tracking items and splits.'}
               </p>
@@ -926,7 +1009,7 @@ export function GroupDetailClient({
               )}
             </div>
           ) : (
-            filteredExpenses.map((expense) => {
+            activeExpenses.map((expense) => {
               const expTotal = expense.items.reduce(
                 (sum, item) => sum + Number(item.amount),
                 0
@@ -1823,16 +1906,146 @@ export function GroupDetailClient({
                         </label>
                         <select
                           value={item.splitType}
-                          onChange={(e) => updateLineItem(idx, "splitType", e.target.value)}
+                          onChange={(e) => {
+                            const newSplitType = e.target.value;
+                            const updated = [...lineItems];
+                            updated[idx].splitType = newSplitType;
+                            if (newSplitType === "PERCENTAGE" && (!updated[idx].customPercentages || Object.keys(updated[idx].customPercentages || {}).length === 0)) {
+                              const sel = updated[idx].selectedUsers;
+                              const defaultPct = sel.length > 0 ? (100 / sel.length).toFixed(1) : "0";
+                              const pcts: Record<string, string> = {};
+                              sel.forEach((uId) => {
+                                pcts[uId] = defaultPct;
+                              });
+                              updated[idx].customPercentages = pcts;
+                            }
+                            setLineItems(autoCalculateTaxShares(updated));
+                          }}
                           className={SELECT_SM_CLASS}
                         >
                           <option value="EQUAL">Split Equally</option>
-                          <option value="CUSTOM">Custom / Proportional</option>
+                          <option value="PERCENTAGE">Percentage Split (%)</option>
+                          <option value="CUSTOM">Custom Amount ({curr})</option>
                           <option value="FULL">100% to One Person</option>
                         </select>
                       </div>
 
-                      {item.splitType === "CUSTOM" ? (
+                      {item.splitType === "PERCENTAGE" ? (
+                        <div className="space-y-2 pt-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-zinc-500 font-medium">
+                              Select Members & Enter % Share:
+                            </span>
+                            {(() => {
+                              const totalPct = item.selectedUsers.reduce(
+                                (acc, uId) => acc + (parseFloat(item.customPercentages?.[uId] || "0") || 0),
+                                0
+                              );
+                              const isExact100 = Math.abs(totalPct - 100) < 0.01;
+                              return (
+                                <span
+                                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                    isExact100
+                                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                      : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                                  }`}
+                                >
+                                  Total: {Math.round(totalPct * 10) / 10}% / 100%
+                                </span>
+                              );
+                            })()}
+                          </div>
+
+                          {/* Member checkboxes / toggles */}
+                          <div className="flex flex-wrap gap-2">
+                            {group.members.map((m) => {
+                              const isSelected = item.selectedUsers.includes(m.user.id);
+                              return (
+                                <button
+                                  type="button"
+                                  key={m.user.id}
+                                  onClick={() => {
+                                    const updated = [...lineItems];
+                                    const current = updated[idx].selectedUsers;
+                                    let newUsers: string[];
+                                    if (current.includes(m.user.id)) {
+                                      if (current.length === 1) return;
+                                      newUsers = current.filter((id) => id !== m.user.id);
+                                    } else {
+                                      newUsers = [...current, m.user.id];
+                                    }
+                                    updated[idx].selectedUsers = newUsers;
+                                    // Recalculate equal percentage default among newly selected
+                                    const pcts: Record<string, string> = { ...(updated[idx].customPercentages || {}) };
+                                    const equalShare = (100 / newUsers.length).toFixed(1);
+                                    newUsers.forEach((uId) => {
+                                      if (!pcts[uId] || current.length !== newUsers.length) {
+                                        pcts[uId] = equalShare;
+                                      }
+                                    });
+                                    updated[idx].customPercentages = pcts;
+                                    setLineItems(autoCalculateTaxShares(updated));
+                                  }}
+                                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold border transition-colors ${
+                                    isSelected
+                                      ? "border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-700"
+                                      : "border-zinc-200 bg-white text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800"
+                                  }`}
+                                >
+                                  {isSelected ? "✓ " : ""}
+                                  {m.user.name.split(" ")[0]}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Percentage inputs for selected users */}
+                          <div className="grid gap-2 sm:grid-cols-2 pt-1">
+                            {group.members
+                              .filter((m) => item.selectedUsers.includes(m.user.id))
+                              .map((m) => {
+                                const pctVal = item.customPercentages?.[m.user.id] || "";
+                                const amtVal = parseFloat(item.amount || "0");
+                                const calcAmt = !isNaN(amtVal) && pctVal ? ((parseFloat(pctVal) / 100) * amtVal).toFixed(2) : "0.00";
+                                return (
+                                  <div
+                                    key={m.user.id}
+                                    className="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-2"
+                                  >
+                                    <div className="truncate">
+                                      <p className="text-xs text-zinc-700 dark:text-zinc-300 font-medium truncate">
+                                        {m.user.name}
+                                      </p>
+                                      <p className="text-[10px] text-zinc-400">
+                                        ≈ {curr}{calcAmt}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        max="100"
+                                        placeholder="0"
+                                        value={pctVal}
+                                        onChange={(e) => {
+                                          const updated = [...lineItems];
+                                          updated[idx].customPercentages = {
+                                            ...(updated[idx].customPercentages || {}),
+                                            [m.user.id]: e.target.value,
+                                          };
+                                          setLineItems(updated);
+                                        }}
+                                        className="w-16 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 px-2 py-1 text-xs text-zinc-900 dark:text-zinc-100 text-right"
+                                      />
+                                      <span className="text-xs font-semibold text-zinc-500">%</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      ) : item.splitType === "CUSTOM" ? (
                         <div className="space-y-2 pt-1">
                           <div className="flex items-center justify-between">
                             <span className="text-[11px] text-zinc-500 font-medium">Custom Amount per Member ({curr})</span>
