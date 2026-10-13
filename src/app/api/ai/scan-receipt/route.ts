@@ -80,11 +80,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const prompt = `You are a receipt/bill OCR parser. Analyze this receipt image and extract ALL line items with their prices.
+    const prompt = `You are an expert receipt/bill OCR parser. Analyze this receipt/bill image and extract the merchant/shop name and ALL line items with their prices.
 
 Return ONLY valid JSON in this exact format, no other text:
 {
-  "merchant": "Name of the restaurant/store or null if unclear",
+  "merchant": "Name of the restaurant, store, cafe, or shop (look at the very top header/logo of the receipt). If absolutely cannot be found, return null",
   "items": [
     { "name": "Item name", "amount": 350 },
     { "name": "Another item", "amount": 120 }
@@ -94,6 +94,7 @@ Return ONLY valid JSON in this exact format, no other text:
 }
 
 Rules:
+- "merchant" MUST be the store/shop/restaurant name printed prominently at the top of the bill (e.g. "McDonald's", "Starbucks", "Chulha Chauki Da Dhaba", "Zara", "Dominos").
 - "amount" must be a number (no currency symbols)
 - Include ALL individual line items from the receipt
 - "tax" should be the tax/GST/service charge amount, or 0 if not listed

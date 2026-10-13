@@ -601,8 +601,10 @@ export function GroupDetailClient({
       const method = isEditing ? "PUT" : "POST";
       
       let autoTitle = "Expense";
-      if (scannedMerchantName) {
-        autoTitle = scannedMerchantName;
+      if (scannedMerchantName && scannedMerchantName.trim()) {
+        autoTitle = scannedMerchantName.trim();
+      } else if (expenseTitle && expenseTitle.trim() && expenseTitle !== "Expense") {
+        autoTitle = expenseTitle.trim();
       } else if (formattedItems.length === 1) {
         autoTitle = formattedItems[0].name;
       } else if (formattedItems.length === 2) {
@@ -1112,48 +1114,55 @@ export function GroupDetailClient({
                     </div>
                   ) : (
                     <div className="divide-y divide-zinc-100 p-4 dark:divide-zinc-800">
-                      {expense.items.map((item) => (
-                        <div key={item.id} className="py-3 first:pt-0 last:pb-0">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                                {item.name}
-                              </span>
-                              <span className="ml-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full">
-                                Paid by {item.payer.name}
+                      {expense.items.map((item) => {
+                        const isSingleItem = expense.items.length === 1;
+                        const isSameAsTitle = item.name.trim().toLowerCase() === expense.title.trim().toLowerCase();
+
+                        return (
+                          <div key={item.id} className="py-3 first:pt-0 last:pb-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {!isSingleItem || !isSameAsTitle ? (
+                                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                                    {item.name}
+                                  </span>
+                                ) : null}
+                                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full">
+                                  Paid by {item.payer.name}
+                                </span>
+                              </div>
+                              <span className="font-bold text-zinc-900 dark:text-zinc-50">
+                                {curr}
+                                {Number(item.amount).toLocaleString()}
                               </span>
                             </div>
-                            <span className="font-bold text-zinc-900 dark:text-zinc-50">
-                              {curr}
-                              {Number(item.amount).toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                            {item.splits.map((split) => {
-                              const isPayer = split.userId === item.payerId;
-                              const share = Number(split.shareAmount || 0);
-                              return (
-                                <span
-                                  key={split.id}
-                                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-zinc-300"
-                                >
-                                  <span className="font-medium">{split.user.name}:</span>
-                                  <span>
-                                    {curr}
-                                    {share.toLocaleString()}
-                                  </span>
-                                  {!isPayer && (
-                                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
-                                      (owes {item.payer.name.split(" ")[0]} {curr}
-                                      {share})
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                              {item.splits.map((split) => {
+                                const isPayer = split.userId === item.payerId;
+                                const share = Number(split.shareAmount || 0);
+                                return (
+                                  <span
+                                    key={split.id}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/60 dark:text-zinc-300"
+                                  >
+                                    <span className="font-medium">{split.user.name}:</span>
+                                    <span>
+                                      {curr}
+                                      {share.toLocaleString()}
                                     </span>
-                                  )}
-                                </span>
-                              );
-                            })}
+                                    {!isPayer && (
+                                      <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                                        (owes {item.payer.name.split(" ")[0]} {curr}
+                                        {share})
+                                      </span>
+                                    )}
+                                  </span>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
