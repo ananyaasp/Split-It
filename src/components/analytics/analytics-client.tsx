@@ -163,22 +163,30 @@ export function AnalyticsClient() {
             No expense history available for monthly graphs yet.
           </p>
         ) : (
-          <div className="mt-6 flex h-48 items-end gap-6 border-b border-zinc-200 pb-4 dark:border-zinc-800 overflow-x-auto">
+          <div className="mt-6 flex h-56 items-end gap-3 sm:gap-6 border-b border-zinc-200 pb-4 dark:border-zinc-800 overflow-x-auto pt-6">
             {data.monthlyTrend.map((m) => {
-              const heightPercent = Math.max((m.amount / maxMonthAmount) * 100, 8);
+              const heightPercent = m.amount > 0 ? Math.max((m.amount / maxMonthAmount) * 100, 10) : 0;
               return (
                 <div
                   key={m.month}
-                  className="flex flex-1 flex-col items-center gap-2 min-w-[50px] group"
+                  className="flex flex-1 flex-col items-center h-full justify-end min-w-[56px] group"
                 >
-                  <span className="text-xs font-bold text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                    ₹{m.amount}
+                  <span className={`text-[11px] font-bold mb-1.5 transition-all text-center ${
+                    m.amount > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-400 dark:text-zinc-600"
+                  }`}>
+                    {m.amount > 0 ? `₹${m.amount.toLocaleString()}` : "—"}
                   </span>
-                  <div
-                    className="w-full max-w-[40px] rounded-t-lg bg-emerald-500 group-hover:bg-emerald-400 transition-all"
-                    style={{ height: `${heightPercent}%` }}
-                  />
-                  <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  <div className="w-full flex items-end justify-center h-36">
+                    <div
+                      className={`w-full max-w-[42px] rounded-t-lg transition-all duration-300 ${
+                        m.amount > 0
+                          ? "bg-emerald-500 hover:bg-emerald-400 shadow-sm"
+                          : "bg-zinc-200 dark:bg-zinc-800 h-1 rounded-full"
+                      }`}
+                      style={{ height: m.amount > 0 ? `${heightPercent}%` : "3px" }}
+                    />
+                  </div>
+                  <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mt-2 whitespace-nowrap">
                     {m.month}
                   </span>
                 </div>

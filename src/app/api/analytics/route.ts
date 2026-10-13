@@ -100,12 +100,22 @@ export async function GET() {
     percentage: totalUserSpent > 0 ? Math.round((g.amount / totalUserSpent) * 100) : 0,
   }));
 
-  const monthlyTrend = Object.entries(monthlyTotals)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, amount]) => ({
-      month,
-      amount: Math.round(amount * 100) / 100,
-    }));
+  // Generate last 6 months up to current month so the chart displays a continuous timeline
+  const now = new Date();
+  const last6Months: string[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    last6Months.push(key);
+  }
+
+  // Include any earlier months present in data as well
+  const allMonths = Array.from(new Set([...Object.keys(monthlyTotals), ...last6Months])).sort();
+
+  const monthlyTrend = allMonths.map((month) => ({
+    month,
+    amount: Math.round((monthlyTotals[month] || 0) * 100) / 100,
+  }));
 
   return NextResponse.json({
     totalUserSpent: Math.round(totalUserSpent * 100) / 100,
